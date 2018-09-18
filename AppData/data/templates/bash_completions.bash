@@ -4,7 +4,7 @@
 # https://unix.stackexchange.com/a/55622
 
 _have {executable_name} &&
-_decide_nospace(){
+_decide_nospace_{current_date}(){
     if [[ ${1} == "--"*"=" ]] ; then
         compopt -o nospace
     fi
@@ -83,7 +83,7 @@ __package_manager_app_{current_date}(){
     "install"|"remove")
         COMPREPLY=( $(compgen -W "-r --report -l --list-relative= -L --list-absolute= \
 -i --interface=" -- "${cur}") )
-        _decide_nospace ${COMPREPLY[0]}
+        _decide_nospace_{current_date} ${COMPREPLY[0]}
         ;;
     "generate")
         COMPREPLY=( $(compgen -W "system_executable" -- "${cur}") )
