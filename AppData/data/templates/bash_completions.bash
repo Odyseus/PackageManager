@@ -3,13 +3,13 @@
 # It would have been impossible to create this without the following post on Stack Exchange!!!
 # https://unix.stackexchange.com/a/55622
 
-_have {executable_name} &&
+type "{executable_name}" &> /dev/null &&
 _decide_nospace_{current_date}(){
     if [[ ${1} == "--"*"=" ]] ; then
-        compopt -o nospace
+        type "compopt" &> /dev/null && compopt -o nospace
     fi
 } &&
-__package_manager_app_{current_date}(){
+__package_manager_cli_{current_date}(){
     local cur prev cmd pkgs_lists_dir pkgs_lists interfaces_dir interfaces
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
@@ -72,7 +72,7 @@ __package_manager_app_{current_date}(){
 
     # Completion of commands and "first level options.
     if [[ $COMP_CWORD == 1 ]]; then
-        COMPREPLY=( $(compgen -W "install remove generate -h --help --version" -- "${cur}") )
+        COMPREPLY=( $(compgen -W "install remove generate -h --help --manual --version" -- "${cur}") )
         return 0
     fi
 
@@ -90,4 +90,4 @@ __package_manager_app_{current_date}(){
         ;;
     esac
 } &&
-complete -F __package_manager_app_{current_date} {executable_name}
+complete -F __package_manager_cli_{current_date} {executable_name}
