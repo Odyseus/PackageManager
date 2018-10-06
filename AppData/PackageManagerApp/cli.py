@@ -14,22 +14,21 @@ root_folder : str
 import os
 import sys
 
-from .__init__ import __appname__, __appdescription__, __version__, __status__
-from .python_utils import exceptions, log_system, shell_utils, file_utils
-from .python_utils.docopt import docopt
-
-if sys.version_info < (3, 5):
-    raise exceptions.WrongPythonVersion()
+from .__init__ import __appdescription__
+from .__init__ import __appname__
+from .__init__ import __status__
+from .__init__ import __version__
+from .python_utils import cli_utils
 
 root_folder = os.path.realpath(os.path.abspath(os.path.join(
     os.path.normpath(os.getcwd()))))
 
-# Store the "docopt" document in a variable to SHUT THE HELL UP Sphinx.
-docopt_doc = """{__appname__} {__version__} {__status__}
+docopt_doc = """{appname} {version} ({status})
 
-{__appdescription__}
+{appdescription}
 
 Usage:
+    app.py (-h | --help | --manual | --version)
     app.py (install | remove) (-i <file> | --interface=<file>)
            (-l <file>... | --list-relative=<file>...
            | -L <path>... | --list-absolute=<path>...)
@@ -39,12 +38,14 @@ Usage:
            [--ignore-installed-filter]
            [-r | --report]
     app.py generate system_executable
-    app.py (-h | --help | --version)
 
 Options:
 
 -h, --help
     Show this screen.
+
+--manual
+    Show this application manual page.
 
 --version
     Show application version.
@@ -76,88 +77,76 @@ Sub-commands for the `generate` command:
     system_executable    Create an executable for this application on the system
                          PATH to be able to run it from anywhere.
 
-""".format(__appname__=__appname__,
-           __appdescription__=__appdescription__,
-           __version__=__version__,
-           __status__=__status__)
+""".format(appname=__appname__,
+           appdescription=__appdescription__,
+           version=__version__,
+           status=__status__)
 
 
-class CommandLineTool():
-    """Command line tool.
+class CommandLineInterface(cli_utils.CommandLineInterfaceSuper):
+    """Command line interface.
 
     It handles the arguments parsed by the docopt module.
 
     Attributes
     ----------
+    a : dict
+        Where docopt_args is stored.
     action : method
         Set the method that will be executed when calling CommandLineTool.run().
-    logger : object
-        See <class :any:`LogSystem`>.
-    package_manager : TYPE
-        Description
-
-    Deleted Attributes
-    ------------------
-    interface : TYPE
-        Description
-    pkgs_list : list
-        The list of packages to remove/install.
+    package_manager : class
+        See :any:`pkg_manager.PackageManager`.
     """
+    action = None
+    package_manager = None
 
-    def __init__(self, args):
+    def __init__(self, docopt_args):
         """
         Parameters
         ----------
-        args : dict
+        docopt_args : dict
             The dictionary of arguments as returned by docopt parser.
         """
-        super(CommandLineTool, self).__init__()
-        self.action = None
-        self.package_manager = None
-        logs_storage_dir = "UserData/logs"
-        log_file = log_system.get_log_file(storage_dir=logs_storage_dir,
-                                           prefix="CLI")
-        file_utils.remove_surplus_files(logs_storage_dir, "CLI*")
-        self.logger = log_system.LogSystem(filename=log_file,
-                                           verbose=True)
+        self.a = docopt_args
+        self._cli_header_blacklist = [self.a["--manual"]]
 
-        self.logger.info(shell_utils.get_cli_header(__appname__), date=False)
-        print("")
+        super().__init__(__appname__, "UserData/logs")
 
-        if args["generate"]:
-            if args["system_executable"]:
+        if self.a["--manual"]:
+            self.action = self.display_manual_page
+        elif self.a["generate"]:
+            if self.a["system_executable"]:
                 self.logger.info("System executable generation...")
                 self.action = self.system_executable_generation
-
-        if any([args["install"], args["remove"]]):
+        elif any([self.a["install"], self.a["remove"]]):
             from . import pkg_manager
 
             self.package_manager = pkg_manager.PackageManager(
-                interface=args["--interface"],
-                pkgs_list_relative=args["--list-relative"],
-                pkgs_list_absolute=args["--list-absolute"],
+                interface=self.a["--interface"],
+                pkgs_list_relative=self.a["--list-relative"],
+                pkgs_list_absolute=self.a["--list-absolute"],
                 logger=self.logger
             )
 
-            if args["install"]:
+            if self.a["install"]:
                 self.action = self.install_packages
-            elif args["remove"]:
+            elif self.a["remove"]:
                 self.action = self.remove_packages
 
     def run(self):
-        """
+        """Execute the assigned action stored in self.action if any.
         """
         if self.action is not None:
             self.action()
             sys.exit(0)
 
     def install_packages(self):
-        """Summary
+        """See :any:`pkg_manager.PackageManager.install_packages`.
         """
         self.package_manager.install_packages()
 
     def remove_packages(self):
-        """Summary
+        """See :any:`pkg_manager.PackageManager.remove_packages`.
         """
         self.package_manager.remove_packages()
 
@@ -199,11 +188,9 @@ class CommandLineTool():
     #     # pkg_mngr.display_initial_report()
 
     def system_executable_generation(self):
-        """See :any:`template_utils.system_executable_generation`
+        """See :any:`cli_utils.CommandLineInterfaceSuper._system_executable_generation`.
         """
-        from .python_utils import template_utils
-
-        template_utils.system_executable_generation(
+        self._system_executable_generation(
             exec_name="package-manager-cli",
             app_root_folder=root_folder,
             sys_exec_template_path=os.path.join(
@@ -213,23 +200,21 @@ class CommandLineTool():
             logger=self.logger
         )
 
+    def display_manual_page(self):
+        """See :any:`cli_utils.CommandLineInterfaceSuper._display_manual_page`.
+        """
+        self._display_manual_page(os.path.join(root_folder, "AppData", "data", "man", "app.py.1"))
+
 
 def main():
-    """Initialize main command line interface.
-
-    Raises
-    ------
-    exceptions.BadExecutionLocation
-        Do not allow to run any command if the "flag" file isn't
-        found where it should be. See :any:`exceptions.BadExecutionLocation`.
+    """Initialize command line interface.
     """
-    if not os.path.exists(".package-manager.flag"):
-        raise exceptions.BadExecutionLocation()
-
-    arguments = docopt(docopt_doc, version="%s %s %s" % (__appname__, __version__, __status__))
-    # print(arguments)
-    cli = CommandLineTool(arguments)
-    cli.run()
+    cli_utils.run_cli(flag_file=".package-manager.flag",
+                      docopt_doc=docopt_doc,
+                      app_name=__appname__,
+                      app_version=__version__,
+                      app_status=__status__,
+                      cli_class=CommandLineInterface)
 
 
 if __name__ == "__main__":

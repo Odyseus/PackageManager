@@ -88,7 +88,7 @@ class PackageManager():
         logger : object
             See <class :any:`LogSystem`>.
         """
-        super(PackageManager, self).__init__()
+        super().__init__()
         self.logger = logger
 
         self.packages = []
