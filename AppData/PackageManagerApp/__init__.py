@@ -10,4 +10,4 @@ __appname__ = "Package Manager"
 
 __appdescription__ = "CLI utility to manage system packages on GNU/Linux. It basically installs and/or eliminates packages in bulk using the system's package manager."
 
-__version__ = "2020-02-14 03:47:21.876"
+__version__ = "2020-02-19 12:00:13.467"
