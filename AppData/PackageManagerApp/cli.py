@@ -157,16 +157,6 @@ class CommandLineInterface(cli_utils.CommandLineInterfaceSuper):
     #     ------
     #     SystemExit
     #         Description
-
-    #     Deleted Parameters
-    #     ------------------
-    #     action : str
-    #         "install" or "remove".
-
-    #     No Longer Raises
-    #     ----------------
-    #     common_utils.CustomRuntimeError
-    #         Raise if list of packages doesn't exists.
     #     """
     #     # Deduplicate packages list.
     #     self.pkgs_list = list(set(self.pkgs_list))
