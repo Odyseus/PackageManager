@@ -9,64 +9,59 @@ _decide_nospace_{current_date}(){
         type "compopt" &> /dev/null && compopt -o nospace
     fi
 } &&
+_get_packages_lists_{current_date}(){
+    echo $(cd {full_path_to_app_folder}; ./app.py print_packages_lists)
+} &&
+_get_interfaces_{current_date}(){
+    echo $(cd {full_path_to_app_folder}; ./app.py print_interfaces)
+} &&
 __package_manager_cli_{current_date}(){
-    local cur prev cmd pkgs_lists_dir pkgs_lists interfaces_dir interfaces
+    local cur prev cmd packages_lists interfaces
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-
-    pkgs_lists_dir="{full_path_to_app_folder}/UserData/packages_lists"
-    # List the files in a specific directory.
-    pkgs_lists=("${pkgs_lists_dir}/"*.py)
-    # Get the file names only.
-    pkgs_lists=(${pkgs_lists[@]##*/})
-    # Remove the extension names.
-    pkgs_lists=(${pkgs_lists[@]%.*})
-
-    interfaces_dir="{full_path_to_app_folder}/UserData/interfaces"
-    # List the files in a specific directory.
-    interfaces=("${interfaces_dir}/"*.py)
-    # Get the file names only.
-    interfaces=(${interfaces[@]##*/})
-    # Remove the extension names.
-    interfaces=(${interfaces[@]%.*})
+    prev_to_prev="${COMP_WORDS[COMP_CWORD-2]}"
 
     case $prev in
-        --list-relative)
-            COMPREPLY=( $( compgen -W "${pkgs_lists[*]}") )
+        "--list-relative"|"-l")
+            packages_lists=( $(_get_packages_lists_{current_date}) )
+
+            if [[ $prev == "--list-relative" ]]; then
+                COMPREPLY=( $( compgen -W "${packages_lists[*]}") )
+            else
+                COMPREPLY=( $( compgen -W "${packages_lists[*]}" -- ${cur}) )
+            fi
+
             return 0
             ;;
-        -l)
-            COMPREPLY=( $( compgen -W "${pkgs_lists[*]}" -- ${cur}) )
-            return 0
-            ;;
-        --interface)
-            COMPREPLY=( $( compgen -W "${interfaces[*]}") )
-            return 0
-            ;;
-        -i)
-            COMPREPLY=( $( compgen -W "${interfaces[*]}" -- ${cur}) )
+        "--interface"|"-i")
+            interfaces=( $(_get_interfaces_{current_date}) )
+
+            if [[ $prev == "--interface" ]]; then
+                COMPREPLY=( $( compgen -W "${interfaces[*]}") )
+            else
+                COMPREPLY=( $( compgen -W "${interfaces[*]}" -- ${cur}) )
+            fi
+
             return 0
             ;;
     esac
 
-    # Handle --xxxxxx=
-    if [[ ${prev} == "--"* && ${cur} == "=" ]] ; then
-        compopt -o filenames
-        COMPREPLY=(*)
-        return 0
-    fi
-
-    # Handle --xxxxx=path
+    # Handle --xxxxx=value
     if [[ ${prev} == "=" ]] ; then
-        # Unescape space
-        cur=${cur//\\ / }
-        # Expand tilder to $HOME
-        [[ ${cur} == "~/"* ]] && cur=${cur/\~/$HOME}
-        # Show completion if path exist (and escape spaces)
-        compopt -o filenames
-        local files=("${cur}"*)
-        [[ -e ${files[0]} ]] && COMPREPLY=( "${files[@]// /\ }" )
+        case $prev_to_prev in
+            "--list-relative")
+                packages_lists=( $(_get_packages_lists_{current_date}) )
+                COMPREPLY=( $( compgen -W "${packages_lists[*]}" -- ${cur}) )
+                return 0
+                ;;
+            "--interface")
+                interfaces=( $(_get_interfaces_{current_date}) )
+                COMPREPLY=( $( compgen -W "${interfaces[*]}" -- ${cur}) )
+                return 0
+                ;;
+        esac
+
         return 0
     fi
 
@@ -82,7 +77,7 @@ __package_manager_cli_{current_date}(){
     case $cmd in
     "install"|"remove")
         COMPREPLY=( $(compgen -W "-r --report -l --list-relative= -L --list-absolute= \
--i --interface=" -- "${cur}") )
+-i --interface= --ignore-exists-check --ignore-installed-check" -- "${cur}") )
         _decide_nospace_{current_date} ${COMPREPLY[0]}
         ;;
     "generate")

@@ -14,6 +14,7 @@ root_folder : str
 import os
 import sys
 
+from . import app_utils
 from .__init__ import __appdescription__
 from .__init__ import __appname__
 from .__init__ import __status__
@@ -29,15 +30,16 @@ docopt_doc = """{appname} {version} ({status})
 
 Usage:
     app.py (-h | --help | --manual | --version)
-    app.py (install | remove) (-i <file> | --interface=<file>)
+    app.py (install | remove)
+           (-i <file> | --interface=<file>)
            (-l <file>... | --list-relative=<file>...
            | -L <path>... | --list-absolute=<path>...)
            [-l <file>... | --list-relative=<file>...
            | -L <path>... | --list-absolute=<path>...]
-           [--ignore-exists-filter]
-           [--ignore-installed-filter]
-           [-r | --report]
+           [--ignore-exists-check]
+           [--ignore-installed-check]
     app.py generate system_executable
+    app.py (print_packages_lists | print_interfaces)
 
 Options:
 
@@ -52,30 +54,23 @@ Options:
 
 -i <file>, --interface=<file>
     File name (no extension) of an existent file in
-    UserData/interfaces/<file>.py that contains the commads that will actually
-    be used to handle packages.
+    **UserData/interfaces/<file>.py** that contains the commands that will
+    actually be used to handle packages.
 
 -l <file>, --list-relative=<file>
     File name (no extension) of an existent file in
-    UserData/packages_lists/<file>.py that contains a list of packages and that
-    will be used with the install/remove commands.
+    **UserData/packages_lists/<file>.py** that contains a list of packages and
+    that will be used with the **install**/**remove** commands.
 
 -L <path>, --list-absolute=<path>
     Full path to a file containing the list of packages that will be used
-    with the install/remove commands.
+    with the **install**/**remove** commands.
 
---ignore-exists-filter
+--ignore-exists-check
     Ignore the check for package existence.
 
---ignore-installed-filter
+--ignore-installed-check
     Ignore the check for package installed.
-
--r, --report
-    Just show an initial report, do not start the install/remove process.
-
-Sub-commands for the `generate` command:
-    system_executable    Create an executable for this application on the system
-                         PATH to be able to run it from anywhere.
 
 """.format(appname=__appname__,
            appdescription=__appdescription__,
@@ -95,7 +90,7 @@ class CommandLineInterface(cli_utils.CommandLineInterfaceSuper):
     action : method
         Set the method that will be executed when calling CommandLineTool.run().
     package_manager : class
-        See :any:`pkg_manager.PackageManager`.
+        See :any:`app_utils.PackageManager`.
     """
     action = None
     package_manager = None
@@ -108,74 +103,63 @@ class CommandLineInterface(cli_utils.CommandLineInterfaceSuper):
             The dictionary of arguments as returned by docopt parser.
         """
         self.a = docopt_args
-        self._cli_header_blacklist = [self.a["--manual"]]
+        self._cli_header_blacklist = [
+            self.a["--manual"],
+            self.a["print_packages_lists"],
+            self.a["print_interfaces"]
+        ]
+        self._inhibit_logger_list = self._cli_header_blacklist
 
         super().__init__(__appname__)
 
         if self.a["--manual"]:
             self.action = self.display_manual_page
+        elif self.a["print_packages_lists"]:
+            self.action = self.print_packages_lists
+        elif self.a["print_interfaces"]:
+            self.action = self.print_interfaces
         elif self.a["generate"]:
             if self.a["system_executable"]:
                 self.logger.info("**System executable generation...**")
                 self.action = self.system_executable_generation
         elif any([self.a["install"], self.a["remove"]]):
-            from . import pkg_manager
-
-            self.package_manager = pkg_manager.PackageManager(
+            self.package_manager = app_utils.PackageManager(
                 interface=self.a["--interface"],
-                pkgs_list_relative=self.a["--list-relative"],
-                pkgs_list_absolute=self.a["--list-absolute"],
+                # De-duplication. docopt workaround.
+                pkgs_list_relative=list(set(self.a["--list-relative"])),
+                # De-duplication. docopt workaround.
+                pkgs_list_absolute=list(set(self.a["--list-absolute"])),
+                ignore_exists_check=self.a["--ignore-exists-check"],
+                ignore_installed_check=self.a["--ignore-installed-check"],
                 logger=self.logger
             )
 
-            if self.a["install"]:
-                self.action = self.install_packages
-            elif self.a["remove"]:
-                self.action = self.remove_packages
+            self.action = self.manage_packages
 
     def run(self):
         """Execute the assigned action stored in self.action if any.
         """
         if self.action is not None:
             self.action()
+            self.print_log_file()
             sys.exit(0)
 
-    def install_packages(self):
-        """See :any:`pkg_manager.PackageManager.install_packages`.
+    def print_packages_lists(self):
+        """See :any:`app_utils.print_config_files_list`.
         """
-        self.package_manager.install_packages()
+        app_utils.print_config_files_list("packages_lists")
 
-    def remove_packages(self):
-        """See :any:`pkg_manager.PackageManager.remove_packages`.
+    def print_interfaces(self):
+        """See :any:`app_utils.print_config_files_list`.
         """
-        self.package_manager.remove_packages()
+        app_utils.print_config_files_list("interfaces")
 
-    # def manage_pkgs(self):
-    #     """Perform package removal/installation.
-
-    #     Raises
-    #     ------
-    #     SystemExit
-    #         Description
-    #     """
-    #     # Deduplicate packages list.
-    #     self.pkgs_list = list(set(self.pkgs_list))
-
-    #     if not self.pkgs_list:
-    #         self.logger.warning("Package list non existent!")
-    #         raise SystemExit()
-
-    #     print(self.pkgs_list)
-
-    #     from . import pkg_manager
-
-    #     pkg_mngr = pkg_manager.PackageManager(**self.data,
-    #                                           logger=self.logger)
-    #     # pkg_mngr = pkg_manager.PackageManager(self.pkgs_list,
-    #     #                                       self.interface,
-    #     #                                       action,
-    #     #                                       logger=self.logger)
-    #     # pkg_mngr.display_initial_report()
+    def manage_packages(self):
+        """See :any:`app_utils.PackageManager.manage_packages`.
+        """
+        self.package_manager.manage_packages(
+            "install" if self.a["install"] else "remove" if self.a["remove"] else None
+        )
 
     def system_executable_generation(self):
         """See :any:`cli_utils.CommandLineInterfaceSuper._system_executable_generation`.
