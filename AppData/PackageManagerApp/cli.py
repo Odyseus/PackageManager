@@ -145,12 +145,12 @@ class CommandLineInterface(cli_utils.CommandLineInterfaceSuper):
             sys.exit(0)
 
     def print_packages_lists(self):
-        """See :any:`app_utils.print_config_files_list`.
+        """See :any:`PackageManagerApp.app_utils.print_config_files_list`.
         """
         app_utils.print_config_files_list("packages_lists")
 
     def print_interfaces(self):
-        """See :any:`app_utils.print_config_files_list`.
+        """See :any:`PackageManagerApp.app_utils.print_config_files_list`.
         """
         app_utils.print_config_files_list("interfaces")
 
